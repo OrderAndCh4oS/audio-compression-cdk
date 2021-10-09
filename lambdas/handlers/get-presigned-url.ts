@@ -1,9 +1,10 @@
-var AWS = require('aws-sdk');
-var s3 = new AWS.S3({
-  signatureVersion: 'v4',
-});
+import {S3} from "aws-sdk";
 
-exports.handler = async function(event) {
+const s3 = new S3({
+  signatureVersion: 'v4',
+})
+
+exports.handler = async function(event: any) {
   const url = s3.getSignedUrl('putObject', {
     Bucket: 'cdkworkshopstack-bucket83908e77-1ojw9gyxpwhp2',
     Key: 'UploadedFile',
