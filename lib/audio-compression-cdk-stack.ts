@@ -3,14 +3,14 @@ import {WebSocketApi, WebSocketStage} from "@aws-cdk/aws-apigatewayv2";
 import {LambdaWebSocketIntegration} from "@aws-cdk/aws-apigatewayv2-integrations";
 import {NodejsFunction} from "@aws-cdk/aws-lambda-nodejs";
 import {PolicyStatement} from "@aws-cdk/aws-iam";
-import {Bucket, CfnBucket} from "@aws-cdk/aws-s3";
+import {Bucket, CfnBucket, HttpMethods} from "@aws-cdk/aws-s3";
 import {Cors, LambdaIntegration, RestApi} from "@aws-cdk/aws-apigateway";
-import {CfnOutput} from "@aws-cdk/core";
 
 export class AudioCompressionCdkStack extends cdk.Stack {
     constructor(scope: cdk.App, id: string, props?: cdk.StackProps) {
         super(scope, id, props);
         const STAGE = 'dev'; // Todo: replace with environment variable
+        const DOMAIN_NAME = 'http://localhost:3000'; // Todo: replace with environment variable
 
         const connectHandler = new NodejsFunction(this, 'AudioCompressionConnect', {
             entry: 'lambdas/websocket/connect.ts',
@@ -69,7 +69,19 @@ export class AudioCompressionCdkStack extends cdk.Stack {
         });
 
         const bucket = new Bucket(this, 'AudioCompressionBucket', {
-            bucketName: 'audio-compression'
+            bucketName: 'audio-compression',
+            cors: [
+                {
+                    allowedMethods: [
+                        HttpMethods.GET,
+                        HttpMethods.POST,
+                        HttpMethods.PUT,
+                    ],
+                    allowedOrigins: [DOMAIN_NAME],
+                    allowedHeaders: ['*'],
+                    maxAge: 3000,
+                },
+            ],
         });
 
         const cfnBucket = bucket.node.defaultChild as CfnBucket
@@ -83,6 +95,9 @@ export class AudioCompressionCdkStack extends cdk.Stack {
                 BUCKET_NAME: cfnBucket.bucketName!
             }
         });
+
+        bucket.grantPut(getPreSignedUrl);
+        bucket.grantPutAcl(getPreSignedUrl);
 
         api.root
             .addResource('presigned-url')
