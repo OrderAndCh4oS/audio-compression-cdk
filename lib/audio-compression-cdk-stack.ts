@@ -68,7 +68,7 @@ export class AudioCompressionCdkStack extends cdk.Stack {
         });
 
         const getPreSignedUrl = new NodejsFunction(this, 'GetPreSignedUrl', {
-            entry: 'lambdas/handlers/get-presigned-url.ts'
+            entry: 'lambdas/handlers/get-presigned-url.js'
         });
 
         api.root
