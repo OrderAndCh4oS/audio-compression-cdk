@@ -5,6 +5,7 @@ import {NodejsFunction} from "@aws-cdk/aws-lambda-nodejs";
 import {PolicyStatement} from "@aws-cdk/aws-iam";
 import {Bucket, CfnBucket} from "@aws-cdk/aws-s3";
 import {Cors, LambdaIntegration, RestApi} from "@aws-cdk/aws-apigateway";
+import {CfnOutput} from "@aws-cdk/core";
 
 export class AudioCompressionCdkStack extends cdk.Stack {
     constructor(scope: cdk.App, id: string, props?: cdk.StackProps) {
@@ -67,19 +68,24 @@ export class AudioCompressionCdkStack extends cdk.Stack {
             },
         });
 
-        const getPreSignedUrl = new NodejsFunction(this, 'GetPreSignedUrl', {
-            entry: 'lambdas/handlers/get-presigned-url.js'
+        const bucket = new Bucket(this, 'AudioCompressionBucket', {
+            bucketName: 'audio-compression'
         });
-
-        api.root
-            .addResource('presigned-url')
-            .addMethod('GET', new LambdaIntegration(getPreSignedUrl));
-
-        const bucket = new Bucket(this, 'AudioCompressionBucket');
 
         const cfnBucket = bucket.node.defaultChild as CfnBucket
         cfnBucket.accelerateConfiguration = {
             accelerationStatus: 'Enabled',
         }
+
+        const getPreSignedUrl = new NodejsFunction(this, 'GetPreSignedUrl', {
+            entry: 'lambdas/handlers/get-presigned-url.ts',
+            environment: {
+                BUCKET_NAME: cfnBucket.bucketName!
+            }
+        });
+
+        api.root
+            .addResource('presigned-url')
+            .addMethod('GET', new LambdaIntegration(getPreSignedUrl));
     }
 }
