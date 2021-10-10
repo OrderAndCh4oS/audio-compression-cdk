@@ -27,12 +27,11 @@ exports.handler = async function(event: any) {
     };
   }
 
+  const filePath = generateUuid();
 
   const presignedPost = s3.createPresignedPost({
     Bucket: BUCKET_NAME,
-    Fields: {
-      Fields: {key: generateUuid(), acl: 'public-read'},
-    },
+    Fields: {key: filePath, acl: 'public-read'},
     // Todo: Set a fixed filetype. Pull this data from the event.body
     Conditions: [
       ['content-length-range', 0, 100000000],
@@ -47,6 +46,6 @@ exports.handler = async function(event: any) {
       "Content-Type": "application/json",
       "Access-Control-Allow-Origin": "http://localhost:3000"
     },
-    body: JSON.stringify(presignedPost)
+    body: JSON.stringify({...presignedPost, filePath})
   };
 };
