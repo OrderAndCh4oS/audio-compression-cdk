@@ -32,7 +32,6 @@ exports.handler = async function(event: any) {
   const presignedPost = s3.createPresignedPost({
     Bucket: BUCKET_NAME,
     Fields: {key: filePath, acl: 'public-read'},
-    // Todo: Set a fixed filetype. Pull this data from the event.body
     Conditions: [
       ['content-length-range', 0, 100000000],
       ['eq', '$Content-Type', fileType],
