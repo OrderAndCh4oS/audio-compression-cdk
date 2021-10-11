@@ -13,7 +13,6 @@ const generateUuid = () => {
 };
 
 exports.handler = async function(event: any) {
-
   const fileType = event.queryStringParameters?.fileType
 
   if (!fileType) {

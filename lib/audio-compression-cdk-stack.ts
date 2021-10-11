@@ -2,15 +2,58 @@ import * as cdk from '@aws-cdk/core';
 import {WebSocketApi, WebSocketStage} from "@aws-cdk/aws-apigatewayv2";
 import {LambdaWebSocketIntegration} from "@aws-cdk/aws-apigatewayv2-integrations";
 import {NodejsFunction} from "@aws-cdk/aws-lambda-nodejs";
-import {PolicyStatement} from "@aws-cdk/aws-iam";
+import {Effect, PolicyDocument, PolicyStatement, Role, ServicePrincipal} from "@aws-cdk/aws-iam";
 import {Bucket, CfnBucket, HttpMethods} from "@aws-cdk/aws-s3";
 import {Cors, LambdaIntegration, RestApi} from "@aws-cdk/aws-apigateway";
+import {Duration} from "@aws-cdk/core";
 
 export class AudioCompressionCdkStack extends cdk.Stack {
     constructor(scope: cdk.App, id: string, props?: cdk.StackProps) {
         super(scope, id, props);
         const STAGE = 'dev'; // Todo: replace with environment variable
         const DOMAIN_NAME = 'http://localhost:3000'; // Todo: replace with environment variable
+        // Note: Get your MEDIA_CONVERT_ENDPOINT here: https://docs.aws.amazon.com/sdk-for-javascript/v3/developer-guide/emc-examples-getendpoint.html
+        const MEDIA_CONVERT_ENDPOINT = 'https://r1eeew44a.mediaconvert.eu-west-1.amazonaws.com'; // Todo: replace with environment variable
+        const BUCKET_NAME = 'audio-compression'; // Todo: replace with environment variable
+
+        const mediaConvertPolicyStatement = new PolicyDocument({
+            statements: [
+                new PolicyStatement({
+                    actions: [
+                        "mediaconvert:*",
+                        "s3:ListAllMyBuckets",
+                        "s3:ListBucket",
+                        "s3:PutObject",
+                        "s3:PutObjectAcl",
+                        "s3:GetObject"
+                    ],
+                    resources: ['*'],
+                    effect: Effect.ALLOW,
+                }),
+                new PolicyStatement({
+                    actions: [
+                        "iam:PassRole"
+                    ],
+                    resources: ['*'],
+                    conditions: {
+                        StringLike: {
+                            "iam:PassedToService": [
+                                "mediaconvert.amazonaws.com"
+                            ]
+                        }
+                    },
+                    effect: Effect.ALLOW,
+                }),
+            ],
+        });
+
+        const role = new Role(this, 'mediaconvert-iam-role', {
+            assumedBy: new ServicePrincipal('mediaconvert.amazonaws.com'),
+            description: 'MediaConvert IAM role in AWS CDK',
+            inlinePolicies: {
+                MediaConvert: mediaConvertPolicyStatement,
+            },
+        });
 
         const connectHandler = new NodejsFunction(this, 'AudioCompressionConnect', {
             entry: 'lambdas/websocket/connect.ts',
@@ -22,7 +65,24 @@ export class AudioCompressionCdkStack extends cdk.Stack {
 
         const audioCompressionHandler = new NodejsFunction(this, 'AudioCompressionMessage', {
             entry: 'lambdas/websocket/audio-compression.ts',
+            timeout: Duration.minutes(2),
+            environment: {
+                MEDIA_CONVERT_ROLE: role.roleArn,
+                MEDIA_CONVERT_ENDPOINT,
+                BUCKET_NAME
+            }
         });
+
+        audioCompressionHandler.addToRolePolicy(new PolicyStatement({
+            actions: [
+                "iam:PassRole",
+                "mediaconvert:*",
+                "s3:ListAllMyBuckets",
+                "s3:ListBucket",
+            ],
+            resources: ['*'],
+            effect: Effect.ALLOW,
+        }))
 
         const webSocketApi = new WebSocketApi(this, 'AudioCompressionWebsocket', {
             connectRouteOptions: {integration: new LambdaWebSocketIntegration({handler: connectHandler})},
@@ -69,7 +129,7 @@ export class AudioCompressionCdkStack extends cdk.Stack {
         });
 
         const bucket = new Bucket(this, 'AudioCompressionBucket', {
-            bucketName: 'audio-compression',
+            bucketName: BUCKET_NAME,
             cors: [
                 {
                     allowedMethods: [
