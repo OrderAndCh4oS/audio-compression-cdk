@@ -67,7 +67,6 @@ export class AudioCompressionCdkStack extends cdk.Stack {
 
         const audioCompressionHandler = new NodejsFunction(this, 'AudioCompressionHandler', {
             entry: 'lambdas/websocket/audio-compression.ts',
-            timeout: Duration.minutes(2),
             environment: {
                 MEDIA_CONVERT_ROLE: role.roleArn,
                 MEDIA_CONVERT_ENDPOINT,
