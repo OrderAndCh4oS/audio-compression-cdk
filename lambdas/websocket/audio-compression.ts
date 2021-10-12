@@ -103,7 +103,7 @@ export const handler = async (event: any) => {
     });
 
     try {
-        await managementApi.postToConnection({ConnectionId: connectionId, Data: 'Job Started'}).promise();
+        await managementApi.postToConnection({ConnectionId: connectionId, Data: 'STARTED'}).promise();
     } catch (e: any) {
         console.log('Stack', e?.stack);
         return {

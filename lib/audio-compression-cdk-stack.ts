@@ -143,6 +143,12 @@ export class AudioCompressionCdkStack extends cdk.Stack {
                     maxAge: 3000,
                 },
             ],
+            lifecycleRules: [
+                {
+                    enabled: true,
+                    expiration: Duration.days(1)
+                }
+            ]
         });
 
         const cfnBucket = bucket.node.defaultChild as CfnBucket
