@@ -1,11 +1,13 @@
 import * as cdk from '@aws-cdk/core';
+import {Duration} from '@aws-cdk/core';
 import {WebSocketApi, WebSocketStage} from "@aws-cdk/aws-apigatewayv2";
 import {LambdaWebSocketIntegration} from "@aws-cdk/aws-apigatewayv2-integrations";
 import {NodejsFunction} from "@aws-cdk/aws-lambda-nodejs";
 import {Effect, PolicyDocument, PolicyStatement, Role, ServicePrincipal} from "@aws-cdk/aws-iam";
 import {Bucket, CfnBucket, HttpMethods} from "@aws-cdk/aws-s3";
 import {Cors, LambdaIntegration, RestApi} from "@aws-cdk/aws-apigateway";
-import {Duration} from "@aws-cdk/core";
+import * as events from '@aws-cdk/aws-events';
+import * as events_targets from '@aws-cdk/aws-events-targets';
 
 export class AudioCompressionCdkStack extends cdk.Stack {
     constructor(scope: cdk.App, id: string, props?: cdk.StackProps) {
@@ -63,13 +65,13 @@ export class AudioCompressionCdkStack extends cdk.Stack {
             entry: 'lambdas/websocket/disconnect.ts',
         });
 
-        const audioCompressionHandler = new NodejsFunction(this, 'AudioCompressionMessage', {
+        const audioCompressionHandler = new NodejsFunction(this, 'AudioCompressionHandler', {
             entry: 'lambdas/websocket/audio-compression.ts',
             timeout: Duration.minutes(2),
             environment: {
                 MEDIA_CONVERT_ROLE: role.roleArn,
                 MEDIA_CONVERT_ENDPOINT,
-                BUCKET_NAME
+                BUCKET_NAME,
             }
         });
 
@@ -162,5 +164,31 @@ export class AudioCompressionCdkStack extends cdk.Stack {
         api.root
             .addResource('presigned-url')
             .addMethod('GET', new LambdaIntegration(getPreSignedUrl));
+
+        const mediaConvertEventsHandler = new NodejsFunction(this, 'MediaConvertEventsHandler', {
+            entry: 'lambdas/handlers/media-convert-events.ts',
+            environment: {
+                STAGE,
+                WEBSOCKET_API_ENDPOINT: webSocketApi.apiEndpoint,
+            }
+        });
+
+        mediaConvertEventsHandler.addToRolePolicy(new PolicyStatement({
+            actions: [
+                'execute-api:ManageConnections',
+            ],
+            resources: ['*'],
+            effect: Effect.ALLOW,
+        }))
+
+        const mediaConvertRule = new events.Rule(this, 'MediaConvertEventsRule', {
+            description: 'mediaconvert events are caught here',
+            eventPattern: {
+                source: ["aws.mediaconvert"],
+                detailType: ["MediaConvert Job State Change"]
+            }
+        });
+
+        mediaConvertRule.addTarget(new events_targets.LambdaFunction(mediaConvertEventsHandler));
     }
 }
