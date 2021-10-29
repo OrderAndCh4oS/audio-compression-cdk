@@ -8,10 +8,6 @@ if (!MEDIA_CONVERT_ROLE) throw new Error('Missing MEDIA_CONVERT_ROLE');
 if (!MEDIA_CONVERT_ENDPOINT) throw new Error('Missing MEDIA_CONVERT_ENDPOINT');
 if (!BUCKET_NAME) throw new Error('Missing BUCKET_NAME');
 
-console.log("MEDIA_CONVERT_ROLE", MEDIA_CONVERT_ROLE);
-console.log("MEDIA_CONVERT_ENDPOINT", MEDIA_CONVERT_ENDPOINT);
-console.log("BUCKET_NAME", BUCKET_NAME)
-
 const mediaConvert = new MediaConvert({
     endpoint: MEDIA_CONVERT_ENDPOINT
 });
@@ -31,13 +27,11 @@ export const handler = async (event: any) => {
 
     const connectionId = event.requestContext.connectionId;
 
-    const managementApi = new ApiGatewayManagementApi({
-        apiVersion: '2018-11-29',
-        endpoint: event.requestContext.domainName + '/' + event.requestContext.stage,
-    });
-
     const params: MediaConvert.Types.CreateJobRequest = {
         Role: MEDIA_CONVERT_ROLE,
+        UserMetadata: {
+            connectionId,
+        },
         Settings: {
             OutputGroups: [
                 {
@@ -103,43 +97,22 @@ export const handler = async (event: any) => {
         };
     }
 
-    await getJob(result.Job?.Id)();
-
-    console.log('HERE!!!!!!!!!!');
+    const managementApi = new ApiGatewayManagementApi({
+        apiVersion: '2018-11-29',
+        endpoint: event.requestContext.domainName + '/' + event.requestContext.stage,
+    });
 
     try {
-        await managementApi.postToConnection({ConnectionId: connectionId, Data: 'Done'}).promise();
+        await managementApi.postToConnection({ConnectionId: connectionId, Data: 'STARTED'}).promise();
     } catch (e: any) {
-        console.log('EEEEERRRRRRROOOOOOOOOOOOORRRRRRRRRRR!!!!!!!');
         console.log('Stack', e?.stack);
         return {
             statusCode: 500,
             body: {error: 'Failed to post to connections'}
         };
     }
-    console.log('DOOOONNNEEEEE!!!!!!!');
     return {
         statusCode: 200,
         body: 'Done'
     };
 };
-
-const getJob = (jobId: string) => async () =>
-    new Promise(async (resolve, reject) => {
-        const interval = setInterval(async () => {
-            const job = await mediaConvert.getJob({Id: jobId}).promise();
-            console.log('Job:', job.Job);
-            if(!job || !job.Job || job.Job.Status === 'ERROR') {
-                console.log('ERROR!!');
-                clearInterval(interval);
-                reject();
-                return
-            }
-            if(job.Job.Status === 'COMPLETE') {
-                console.log('COMPLETE!!');
-                clearInterval(interval);
-                resolve('done');
-                return
-            }
-        }, 200);
-    })
